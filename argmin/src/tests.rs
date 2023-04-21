@@ -16,6 +16,7 @@ use crate::solver::gradientdescent::SteepestDescent;
 use crate::solver::linesearch::{HagerZhangLineSearch, MoreThuenteLineSearch};
 use crate::solver::newton::NewtonCG;
 use crate::solver::quasinewton::{BFGS, DFP, LBFGS};
+use crate::solver::powell::Powell;
 
 #[cfg(feature = "serde1")]
 use serde::{Deserialize, Serialize};
@@ -152,6 +153,7 @@ entropy_max_tests! {
      test_max_entropy_lbfgs_hagerzhang: LBFGS::new(HagerZhangLineSearch::new(), 10),
      test_max_entropy_newton_cg: NewtonCG::new(MoreThuenteLineSearch::new()),
      test_max_entropy_steepest_descent: SteepestDescent::new(MoreThuenteLineSearch::new()),
+     test_max_entropy_powell: Powell::new(vec![arr1(&[1.,0.,0.]), arr1(&[0.,1.,0.]), arr1(&[0.,0.,1.])], arr1(&[1e-7,1e-7,1e-7]), 1e-7),
 }
 
 entropy_max_tests_with_inv_hessian! {

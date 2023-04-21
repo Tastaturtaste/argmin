@@ -102,7 +102,7 @@ ndarray_v0_13-nolinalg-serde = ["ndarray_v0_13-nolinalg", "ndarray_0_13/serde-1"
 # on as well. Note that the version number in `_dev_linalg_*` is always one below the `ndarray`
 # version. For instance, for ndarray 0.15, one would use the `_dev_linalg_0_14` feature.
 _dev_linalg_latest = ["_dev_linalg_0_16"]
-_dev_linalg_0_16 = ["ndarray-linalg_0_16/netlib-static"]
+_dev_linalg_0_16 = ["ndarray-linalg_0_16/intel-mkl-static"]
 _dev_linalg_0_13 = ["ndarray-linalg_0_13/netlib-static"]
 _dev_linalg_0_12 = ["ndarray-linalg_0_12/netlib"]
 

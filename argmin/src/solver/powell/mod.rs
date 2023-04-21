@@ -7,31 +7,28 @@ use argmin_math::{ArgminAdd, ArgminDot, ArgminScaledAdd, ArgminSub, ArgminZeroLi
 #[cfg(feature = "serde1")]
 use serde::{Deserialize, Serialize};
 use std::mem;
-
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 /// Implementation of the powell method for the optimization of mulitvariate functions without the need for
 /// derivative information.
-pub struct Powell<P, L, F> {
+pub struct Powell<P, F> {
     search_vectors: Vec<P>,
-    linesearch: L,
     param_tol: P,
     func_tol: F,
 }
 
-impl<P, L, F> Powell<P, L, F> {
+impl<P, F> Powell<P, F> {
     /// Initialize the Powell optimizer
-    pub fn new(initial_search_vectors: Vec<P>, linesearch: L, param_tol: P, func_tol: F) -> Self {
+    pub fn new(initial_search_vectors: Vec<P>, param_tol: P, func_tol: F) -> Self {
         Powell {
             search_vectors: initial_search_vectors,
-            linesearch,
             param_tol,
             func_tol,
         }
     }
 }
 
-impl<O, P, F, L> Solver<O, IterState<P, (), (), (), F>> for Powell<P, L, F>
+impl<O, P, F> Solver<O, IterState<P, (), (), (), F>> for Powell<P, F>
 where
     O: CostFunction<Param = P, Output = F>,
     P: Clone
@@ -41,12 +38,29 @@ where
         + ArgminZeroLike
         + ArgminSub<P, P>
         + ArgminDot<P, F>
-        + ArgminScaledAdd<P, F, P>,
+        + ArgminScaledAdd<P, F, P> + std::fmt::Debug,
     F: ArgminFloat,
-    L: Clone + LineSearch<P, F> + Solver<O, IterState<P, (), (), (), F>>,
 {
     const NAME: &'static str = "Powell";
-
+    fn init(
+        &mut self,
+        problem: &mut Problem<O>,
+        mut state: IterState<P, (), (), (), F>,
+    ) -> Result<(IterState<P, (), (), (), F>, Option<crate::core::KV>), anyhow::Error> {
+        let init_param = state.take_param().ok_or_else(argmin_error_closure!(
+            NotInitialized,
+            concat!(
+                "`Powell` requires an initial parameter vector. ",
+                "Please provide an initial guess via `Executor`s `configure` method."
+            )
+        ))?;
+        let cost = if state.get_cost().is_infinite() {
+            problem.cost(&init_param)?
+        } else {
+            state.cost
+        };
+        Ok((state.param(init_param).cost(cost), None))
+    }
     /// An iteration of the powell method as implemented in scipy
     fn next_iter(
         &mut self,
@@ -76,6 +90,7 @@ where
             // TODO: Find way to add func_eval_counts from bracket to the overall counter
             let mut brent_line_search = BrentOptLineSearch::new(xa, xc);
             brent_line_search.search_direction(search_vector.to_owned());
+            brent_line_search.initial_step_length(float!(1e-3))?;
 
             // Run solver
             let OptimizationResult {
@@ -125,10 +140,7 @@ where
                 "Improvement of cost per iteration below specified tolerance.".to_owned(),
             ));
         }
-
-        let mut state = state.param(param).cost(cost);
-        state.increment_iter();
-
+        let state = state.param(param).cost(cost);
         Ok((state, None))
     }
 }
@@ -163,8 +175,7 @@ fn bracket<F: ArgminFloat>(
     f: impl Fn(&F) -> Result<F, crate::core::Error>,
     options: BracketOptions<F>,
 ) -> Result<BracketResult<F>, crate::core::Error> {
-    let golden_ratio: F =
-        float!(1.618_033_988_749_895);
+    let golden_ratio: F = float!(1.618_033_988_749_895);
     let BracketOptions {
         mut xa,
         mut xb,
@@ -176,13 +187,8 @@ fn bracket<F: ArgminFloat>(
         ($x:expr) => {{
             func_eval_count += 1;
             f($x)
-        }
-        };
+        }};
     }
-    // let mut f_counted = |x| {
-    //     func_eval_count += 1;
-    //     f(x)
-    // };
     let mut fa = f_counted!(&xa)?;
     let mut fb = f_counted!(&xb)?;
     if fa < fb {
